@@ -15,6 +15,12 @@
 <sup>3</sup>  University of Genoa
 </div>
 
+<div align="center">
+<a href="https://arxiv.org/abs/2602.17683">
+  <img src="https://img.shields.io/badge/arXiv-2602.17683-B31B1B?style=flat&logo=arxiv&logoColor=white"/>
+</a>
+</div>
+
 <br/>
 
 <p align="center">
