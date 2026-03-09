@@ -23,9 +23,28 @@
 
 <br/>
 
-<p align="center">
-  <b>Code availability:</b> the code will be publicly released once the paper is accepted.
-</p>
+# Release (quantile ablation)
+
+Questa cartella contiene solo il codice necessario per il training del modello **AgriMatNet quantile** con script di **ablation**.
+
+Incluso:
+- `agrimatnet/train_quantile_ablation.py`
+- `agrimatnet/model_quantile.py`
+- `agrimatnet/layers.py`
+- `agrimatnet/train_utils.py`
+- `dataset_builder/torch_dataset.py`
+- `dataset_builder/scaler.py`
+- `requirements.txt`
+
+Escluso volutamente:
+- dataset/cache (`timeSeries/...`)
+- checkpoint/output/log
+- script e codice baseline/competitor
+
+## Esecuzione
+```bash
+python agrimatnet/train_quantile_ablation.py --cache-root /percorso/alla/cache/train
+```
 
 ## Contact
 For questions and comments, feel free to contact me: irene.iele@unicampus.it
