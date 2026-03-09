@@ -29,56 +29,71 @@ python agrimatnet/test_quantile_ablation.py --cache-root /percorso/alla/cache/te
 
 Questa release include un servizio FastAPI per esporre il modello via HTTP.
 
-### 1) Avvio servizio
+### 1) Avvio `uvicorn`
 
 ```bash
-uvicorn webapp.api:app --host 0.0.0.0 --port 8000
+source .venv/bin/activate
+uvicorn webapp.api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Variabili ambiente supportate:
+Variabili ambiente principali:
+- `MODEL_PATH` percorso pesi modello (default: `weights/model_best.pth`)
+- `SCALER_PATH` percorso scaler (default: `dataset_builder/scaler.json`)
+- `QUANTILES` quantili separati da virgola (es. `0.1,0.5,0.9`)
+- `INPUT_DIM`, `D_MODEL`, `NUM_LAYERS`, `NUM_HEADS`, `DIM_FEEDFORWARD`, `DROPOUT` override architettura
 
-- `MODEL_PATH` (default: `weights/model_best.pth`)
-- `SCALER_PATH` (opzionale, se vuoi scaling input + inverse scaling output)
-- `QUANTILES` (es. `0.1,0.5,0.9`; default: da checkpoint se presente, altrimenti `0.1,0.5,0.9`)
-- `INPUT_DIM`, `D_MODEL`, `NUM_LAYERS`, `NUM_HEADS`, `DIM_FEEDFORWARD`, `DROPOUT` (override opzionali)
-
-Esempio:
+Esempio con env var:
 
 ```bash
 MODEL_PATH=weights/model_best.pth \
-SCALER_PATH=/percorso/scaler.json \
+SCALER_PATH=dataset_builder/scaler.json \
 QUANTILES=0.1,0.5,0.9 \
-uvicorn webapp.api:app --host 0.0.0.0 --port 8000
+uvicorn webapp.api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 2) Endpoint disponibili
+### 2) Health check
 
-- `GET /health` stato servizio e configurazione runtime
-- `POST /predict` inferenza NDVI quantile
-
-Payload `POST /predict` (singolo campione):
-
-```json
-{
-  "history": [[0.1, 0.2, 0.3], [0.2, 0.2, 0.35]],
-  "future": [[0.25, 0.1, 0.4], [0.22, 0.12, 0.42], [0.2, 0.11, 0.41]],
-  "history_mask": [[false, false, false], [false, false, false]],
-  "future_mask": [[false, false, false], [false, false, false], [false, false, false]],
-  "future_target_positions": [0, 1, 2],
-  "apply_input_scaling": true,
-  "inverse_target_scaling": true
-}
+```bash
+curl http://127.0.0.1:8000/health
 ```
 
-Risposta:
+### 3) Predict (esempio 5 timestep futuri)
 
-```json
-{
-  "quantiles": [0.1, 0.5, 0.9],
-  "predictions": [
-    [0.41, 0.45, 0.5],
-    [0.39, 0.44, 0.49],
-    [0.38, 0.43, 0.48]
-  ]
-}
+```bash
+curl -X POST "http://127.0.0.1:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "history": [
+      [0.10,0.00,12.3,3.2,0.40,0.15,0.80,0.00,0.22,0.11,0.05,0.00,0.00,0.10,0.00,0.00,0.00,0.00,0.35],
+      [0.12,0.00,12.7,3.1,0.41,0.16,0.81,0.00,0.23,0.10,0.05,0.00,0.00,0.11,0.00,0.00,0.00,0.00,0.36]
+    ],
+    "future": [
+      [0.13,0.00,13.0,3.0,0.42,0.17,0.82,0.00,0.24,0.10,0.05,0.00,0.00,0.12,0.00,0.00,0.00,0.00,0.00],
+      [0.14,0.00,13.2,3.0,0.43,0.18,0.82,0.00,0.25,0.10,0.05,0.00,0.00,0.13,0.00,0.00,0.00,0.00,0.00],
+      [0.15,0.00,13.4,2.9,0.44,0.18,0.83,0.00,0.26,0.09,0.05,0.00,0.00,0.14,0.00,0.00,0.00,0.00,0.00],
+      [0.16,0.00,13.6,2.9,0.45,0.19,0.83,0.00,0.27,0.09,0.05,0.00,0.00,0.15,0.00,0.00,0.00,0.00,0.00],
+      [0.17,0.00,13.8,2.8,0.46,0.19,0.84,0.00,0.28,0.09,0.05,0.00,0.00,0.16,0.00,0.00,0.00,0.00,0.00]
+    ],
+    "forecast_horizon": 5,
+    "apply_input_scaling": true,
+    "inverse_target_scaling": true
+  }'
 ```
+
+### 4) Significato parametri `POST /predict`
+
+- `history`: sequenza storica `[T_history, F]` (F=19 base, oppure F=28 se già con feature engineering).
+- `future`: sequenza futura `[T_future, F]` con stesso numero di feature di `history`.
+- `history_mask` (opzionale): matrice booleana come `history`; `true` indica valore da ignorare.
+- `future_mask` (opzionale): matrice booleana come `future`; `true` indica valore da ignorare.
+- `future_target_positions` (opzionale): indici esatti dei timestep futuri da predire (es. `[0,2,4]`).
+- `forecast_horizon` (opzionale): alternativa a `future_target_positions`; predice i primi `N` step (`[0..N-1]`).
+- `history_timestamps` (opzionale): timestamp ISO della history, usati per calcolo rolling 7d/14d reale.
+- `future_timestamps` (opzionale): timestamp ISO del future, usati per calcolo rolling 7d/14d reale.
+- `apply_input_scaling`: applica scaling input se lo scaler è configurato.
+- `inverse_target_scaling`: riporta l'output in scala target originale se lo scaler ha statistiche target.
+
+Note:
+- usare solo uno tra `future_target_positions` e `forecast_horizon`;
+- se non passi nessuno dei due, il modello predice tutti i timestep di `future`;
+- output `predictions` ha shape `[num_timestep_predetti, num_quantili]`.
