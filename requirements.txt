@@ -180,6 +180,8 @@ torchvision
 tornado
 tqdm
 typing_extensions
+fastapi
+uvicorn
 ujson
 urllib3
 virtualenv
