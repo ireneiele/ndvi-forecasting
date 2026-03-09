@@ -267,10 +267,6 @@ class PredictionRequest(BaseModel):
         default=None,
         description="Indici dei timestep nel future da predire. Default: tutti i timestep.",
     )
-    forecast_horizon: Optional[int] = Field(
-        default=None,
-        description="Numero di timestep futuri da predire (alternativa a future_target_positions).",
-    )
     history_timestamps: Optional[List[str]] = Field(
         default=None, description="Timestamp history ISO (opzionale, usato per rolling 7d/14d reale)."
     )
@@ -393,20 +389,10 @@ def predict(payload: PredictionRequest):
         future_mask = _to_mask(future, payload.future_mask, "future_mask")
 
         # Se non specificato, predice su tutti i timestep del future.
-        if payload.future_target_positions is not None and payload.forecast_horizon is not None:
-            raise ValueError("Usa solo uno tra future_target_positions e forecast_horizon.")
         if payload.future_target_positions is not None:
             if not payload.future_target_positions:
                 raise ValueError("future_target_positions non puo essere vuoto.")
             target_positions = payload.future_target_positions
-        elif payload.forecast_horizon is not None:
-            if payload.forecast_horizon <= 0:
-                raise ValueError("forecast_horizon deve essere > 0.")
-            if payload.forecast_horizon > future.shape[0]:
-                raise ValueError(
-                    f"forecast_horizon={payload.forecast_horizon} supera la lunghezza future={future.shape[0]}."
-                )
-            target_positions = list(range(payload.forecast_horizon))
         else:
             target_positions = list(range(future.shape[0]))
 

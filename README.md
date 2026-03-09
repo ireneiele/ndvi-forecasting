@@ -74,7 +74,7 @@ curl -X POST "http://127.0.0.1:8000/predict" \
       [0.16,0.00,13.6,2.9,0.45,0.19,0.83,0.00,0.27,0.09,0.05,0.00,0.00,0.15,0.00,0.00,0.00,0.00,0.00],
       [0.17,0.00,13.8,2.8,0.46,0.19,0.84,0.00,0.28,0.09,0.05,0.00,0.00,0.16,0.00,0.00,0.00,0.00,0.00]
     ],
-    "forecast_horizon": 5,
+    "future_target_positions": [0,1,2,3,4],
     "apply_input_scaling": true,
     "inverse_target_scaling": true
   }'
@@ -87,13 +87,11 @@ curl -X POST "http://127.0.0.1:8000/predict" \
 - `history_mask` (opzionale): matrice booleana come `history`; `true` indica valore da ignorare.
 - `future_mask` (opzionale): matrice booleana come `future`; `true` indica valore da ignorare.
 - `future_target_positions` (opzionale): indici esatti dei timestep futuri da predire (es. `[0,2,4]`).
-- `forecast_horizon` (opzionale): alternativa a `future_target_positions`; predice i primi `N` step (`[0..N-1]`).
 - `history_timestamps` (opzionale): timestamp ISO della history, usati per calcolo rolling 7d/14d reale.
 - `future_timestamps` (opzionale): timestamp ISO del future, usati per calcolo rolling 7d/14d reale.
 - `apply_input_scaling`: applica scaling input se lo scaler è configurato.
 - `inverse_target_scaling`: riporta l'output in scala target originale se lo scaler ha statistiche target.
 
 Note:
-- usare solo uno tra `future_target_positions` e `forecast_horizon`;
-- se non passi nessuno dei due, il modello predice tutti i timestep di `future`;
+- se non passi `future_target_positions`, il modello predice tutti i timestep di `future`;
 - output `predictions` ha shape `[num_timestep_predetti, num_quantili]`.
