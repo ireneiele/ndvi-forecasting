@@ -273,6 +273,12 @@ class PredictionRequest(BaseModel):
     future_timestamps: Optional[List[str]] = Field(
         default=None, description="Timestamp future ISO (opzionale, usato per rolling 7d/14d reale)."
     )
+    feature_engineering: bool = Field(
+        default=DEFAULT_AUTO_FEATURE_ENGINEERING,
+        description=(
+            "Se true, aggiunge le feature ingegnerizzate online quando l'input arriva nello schema base."
+        ),
+    )
     apply_input_scaling: bool = Field(
         default=DEFAULT_APPLY_INPUT_SCALING,
         description="Se true e presente lo scaler, scala history/future prima del forward.",
@@ -408,7 +414,7 @@ def predict(payload: PredictionRequest):
         input_dim_received = history.shape[1]
         model_input_dim = runtime["input_dim"]
         can_expand = (
-            DEFAULT_AUTO_FEATURE_ENGINEERING
+            payload.feature_engineering
             and input_dim_received == DEFAULT_BASE_INPUT_DIM
             and model_input_dim == DEFAULT_BASE_INPUT_DIM + DEFAULT_ENGINEERED_FEATURES
         )

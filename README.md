@@ -57,28 +57,57 @@ uvicorn webapp.api:app --host 0.0.0.0 --port 8000 --reload
 curl http://127.0.0.1:8000/health
 ```
 
-### 3) Predict (esempio 5 timestep futuri)
+### 3) Predict (esempio 3 passaggi futuri)
+
+Schema colonne dell'input base:
+
+| Posizione | Nome colonna |
+|---|---|
+| 1 | `rainfall` |
+| 2 | `avg_temperature` |
+| 3-18 | altre covariate meteo/temporali presenti nella cache di training |
+| 19 | `NDVI` storico, cioe il target passato |
+
+Se `feature_engineering=true` e il modello e stato addestrato con le feature ingegnerizzate, la API espande automaticamente l'input da 19 a 28 colonne aggiungendo le 9 feature derivate prima dell'ultima colonna.
+
+Quindi una finestra storica di 3 timestep si legge cosi:
+
+```text
+t-2: rainfall=0.09, avg_temperature=12.1, ..., NDVI=0.34
+t-1: rainfall=0.10, avg_temperature=12.3, ..., NDVI=0.35
+t0:  rainfall=0.12, avg_temperature=12.7, ..., NDVI=0.36
+```
+
+Nello stesso modo, `future` contiene i 3 timestep futuri da cui il modello deve produrre la previsione.
+Anche `future` usa lo stesso schema a 19 colonne, ma la colonna `NDVI` dei timestep futuri non e nota: puoi lasciarla vuota o `NaN` e la API la esclude automaticamente.
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/predict" \
   -H "Content-Type: application/json" \
   -d '{
     "history": [
-      [0.10,0.00,12.3,3.2,0.40,0.15,0.80,0.00,0.22,0.11,0.05,0.00,0.00,0.10,0.00,0.00,0.00,0.00,0.35],
-      [0.12,0.00,12.7,3.1,0.41,0.16,0.81,0.00,0.23,0.10,0.05,0.00,0.00,0.11,0.00,0.00,0.00,0.00,0.36]
+      [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19],
+      [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19],
+      [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19]
     ],
     "future": [
-      [0.13,0.00,13.0,3.0,0.42,0.17,0.82,0.00,0.24,0.10,0.05,0.00,0.00,0.12,0.00,0.00,0.00,0.00,0.00],
-      [0.14,0.00,13.2,3.0,0.43,0.18,0.82,0.00,0.25,0.10,0.05,0.00,0.00,0.13,0.00,0.00,0.00,0.00,0.00],
-      [0.15,0.00,13.4,2.9,0.44,0.18,0.83,0.00,0.26,0.09,0.05,0.00,0.00,0.14,0.00,0.00,0.00,0.00,0.00],
-      [0.16,0.00,13.6,2.9,0.45,0.19,0.83,0.00,0.27,0.09,0.05,0.00,0.00,0.15,0.00,0.00,0.00,0.00,0.00],
-      [0.17,0.00,13.8,2.8,0.46,0.19,0.84,0.00,0.28,0.09,0.05,0.00,0.00,0.16,0.00,0.00,0.00,0.00,0.00]
+      [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19],
+      [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19],
+      [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19]
     ],
-    "future_target_positions": [0,1,2,3,4],
+    "future_target_positions": [0,1,2],
     "apply_input_scaling": true,
+    "feature_engineering": true,
     "inverse_target_scaling": true
   }'
 ```
+
+Qui `f1` ... `f18` sono le feature di input e `f19` è il target storico (`NDVI`).
+
+Lettura dell'esempio:
+- ogni riga di `history` e `future` rappresenta un timestep
+- `history` contiene il passato osservato, `future` i timestep da prevedere
+- `future_target_positions: [0,1,2]` chiede la previsione sui primi 3 passaggi futuri
 
 ### 4) Significato parametri `POST /predict`
 
@@ -89,9 +118,13 @@ curl -X POST "http://127.0.0.1:8000/predict" \
 - `future_target_positions` (opzionale): indici esatti dei timestep futuri da predire (es. `[0,2,4]`).
 - `history_timestamps` (opzionale): timestamp ISO della history, usati per calcolo rolling 7d/14d reale.
 - `future_timestamps` (opzionale): timestamp ISO del future, usati per calcolo rolling 7d/14d reale.
+- `feature_engineering`: se `true`, la API aggiunge online le 9 feature ingegnerizzate quando riceve l'input base a 19 colonne.
 - `apply_input_scaling`: applica scaling input se lo scaler è configurato.
 - `inverse_target_scaling`: riporta l'output in scala target originale se lo scaler ha statistiche target.
 
 Note:
 - se non passi `future_target_positions`, il modello predice tutti i timestep di `future`;
+- se mandi `history` e `future` con 19 feature base, la API può espanderle automaticamente a 28 feature se il modello e lo scaler sono stati addestrati con feature engineering;
+- le feature ingegnerizzate usano `rainfall` e `avg_temperature` come colonne base, quindi l'ordine colonne deve essere coerente con quello usato in training;
+- i `NaN` nel payload vengono mascherati automaticamente dal codice, quindi non serve azzerare manualmente `NDVI` futuro;
 - output `predictions` ha shape `[num_timestep_predetti, num_quantili]`.
